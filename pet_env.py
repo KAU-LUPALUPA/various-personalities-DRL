@@ -64,6 +64,8 @@ class PetSim:
         self.last_action = 0
         self.last_reward = 0.0
         self.last_action_status = "초기화됨"
+        self.action_counts = [0] * len(self.ACTIONS)
+        self.total_action_steps = 0
 
     def set_personality(self, activeness, gluttony, patience, curiosity, loyalty):
         self.personality["activeness"] = activeness
@@ -122,6 +124,14 @@ class PetSim:
         self.last_action = action
         reward = 0.0
         status = ""
+
+        # Track action selection
+        if 0 <= action < len(self.action_counts):
+            self.action_counts[action] += 1
+            self.total_action_steps += 1
+
+        # Store initial command status before actions modify it
+        command_was_active = self.command_pending
 
         # Ambient decay of states on each step
         self.cleanliness = max(0.0, self.cleanliness - 0.005)
@@ -289,13 +299,13 @@ class PetSim:
                     self.fullness = max(0.0, self.fullness - 0.02)
                     self.boredom = min(1.0, self.boredom + 0.05)
                     
-                    if self.command_pending:
+                    if command_was_active:
                         reward = 0.8 * P_loyal if P_loyal >= 0.5 else -0.3 * (1.0 - P_loyal)
                     else:
                         reward = -0.1
 
         # Apply loyalty penalties/rewards if owner issued a command
-        if self.command_pending:
+        if command_was_active:
             if action == self.ACTIONS["CLEAN_TOY"]:
                 if P_loyal >= 0.5:
                     reward += 0.4 * P_loyal
@@ -306,6 +316,10 @@ class PetSim:
                     reward -= 0.5 * P_loyal
                 else:
                     reward += 0.3 * (1.0 - P_loyal)
+
+        # Update toy position if carrying it to maintain physical consistency
+        if self.carrying_toy:
+            self.toy_pos = {"x": self.x, "y": self.y}
 
         # Keep state values bounded
         self.cleanliness = min(1.0, max(0.0, self.cleanliness))

@@ -167,15 +167,15 @@ class PygameSimulator:
         self.draw_x = self.pet.x
         self.draw_y = self.pet.y
         self.action_names = [
-            "가만히 있기 (Idle)",
-            "돌아다니기 (Wander)",
-            "밥 먹기 (Eat)",
-            "침대 자기 (Sleep Bed)",
-            "바닥 자기 (Sleep Floor)",
-            "장난감 놀기 (Play)",
+            "대기 (Idle)",
+            "배회 (Wander)",
+            "식사 (Eat)",
+            "침대 수면 (Sleep)",
+            "바닥 수면 (Floor)",
+            "놀이 (Play)",
             "그루밍 (Groom)",
-            "씻기 (Wash)",
-            "장난감 정리 (Clean up)"
+            "목욕 (Wash)",
+            "정리 (Clean)"
         ]
 
     def add_particles(self, x, y, particle_type, count=5):
@@ -399,24 +399,36 @@ class PygameSimulator:
         draw_status_bar(620, 362, "스태미너", self.pet.stamina, COLOR_STAMINA)
         draw_status_bar(800, 362, "지루함", self.pet.boredom, COLOR_BORED)
 
-        # DQN Action Q-values Y: 400 to 500 (Small horizontal bar charts)
-        q_lbl_surf = self.font_section.render("DQN Q-value 가치 판단 분석", True, TEXT_PRIMARY)
-        self.screen.blit(q_lbl_surf, (620, 412))
+        # DQN Action Q-values Y: 398 to 515 (Small horizontal bar charts with selection percentage)
+        q_lbl_surf = self.font_section.render("DQN 분석 (선택 비율 | Q값)", True, TEXT_PRIMARY)
+        self.screen.blit(q_lbl_surf, (620, 398))
 
         s = self.pet.get_state_vector()
         q_values = self.agent.get_q_values(s)
         max_q_idx = np.argmax(q_values)
 
-        q_bar_y = 436
-        q_bar_h = 10
-        q_bar_max_w = 140
-        q_spacing = 13
+        q_bar_y = 418
+        q_bar_h = 8
+        q_bar_max_w = 110
+        q_spacing = 11
+
+        total_steps = self.pet.total_action_steps
 
         for i in range(self.agent.action_size):
             q_val = q_values[i]
+            
+            # Calculate action percentage
+            act_count = self.pet.action_counts[i]
+            pct = (act_count / total_steps * 100.0) if total_steps > 0 else 0.0
+            
             # Print Action label
             lbl_act = self.font_small.render(self.action_names[i], True, TEXT_PRIMARY if i == max_q_idx else TEXT_SECONDARY)
             self.screen.blit(lbl_act, (620, q_bar_y + i * q_spacing))
+            
+            # Print Percentage label
+            pct_color = COLOR_CLEAN if i == max_q_idx else TEXT_SECONDARY
+            lbl_pct = self.font_small.render(f"{pct:.1f}%", True, pct_color)
+            self.screen.blit(lbl_pct, (742, q_bar_y + i * q_spacing))
             
             # Draw Q-bar
             # Normalize q_value (map -1.0 to 1.0 -> 0 to q_bar_max_w)
@@ -425,14 +437,14 @@ class PygameSimulator:
             
             bar_color = ACCENT if i == max_q_idx else (80, 85, 115)
             # Track
-            pygame.draw.rect(self.screen, (35, 39, 66), (770, q_bar_y + i * q_spacing + 2, q_bar_max_w, q_bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, (35, 39, 66), (785, q_bar_y + i * q_spacing + 2, q_bar_max_w, q_bar_h), border_radius=4)
             # Fill
             if bar_w > 0:
-                pygame.draw.rect(self.screen, bar_color, (770, q_bar_y + i * q_spacing + 2, bar_w, q_bar_h), border_radius=4)
+                pygame.draw.rect(self.screen, bar_color, (785, q_bar_y + i * q_spacing + 2, bar_w, q_bar_h), border_radius=4)
 
             # Value label
             lbl_q = self.font_small.render(f"{q_val:.2f}", True, TEXT_PRIMARY if i == max_q_idx else TEXT_SECONDARY)
-            self.screen.blit(lbl_q, (925, q_bar_y + i * q_spacing))
+            self.screen.blit(lbl_q, (910, q_bar_y + i * q_spacing))
 
         # Reward Plot Canvas Y: 512 to 595 (Height 80)
         # Draw frame
