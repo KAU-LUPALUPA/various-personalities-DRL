@@ -97,6 +97,19 @@ class DetailsRequest(BaseModel):
     curiosity: float = Field(..., ge=0.0, le=1.0, description="성격: 호기심 (0.0~1.0)")
     loyalty: float = Field(..., ge=0.0, le=1.0, description="성격: 충성도 (0.0~1.0)")
 
+    # Optional dynamic coordinates of objects (default to baseline positions)
+    food_x: float = Field(80.0, description="밥그릇 X 좌표")
+    food_y: float = Field(80.0, description="밥그릇 Y 좌표")
+    bed_x: float = Field(520.0, description="침대 X 좌표")
+    bed_y: float = Field(520.0, description="침대 Y 좌표")
+    wash_x: float = Field(80.0, description="목욕탕 X 좌표")
+    wash_y: float = Field(320.0, description="목욕탕 Y 좌표")
+    toy_x: float = Field(520.0, description="장난감 X 좌표")
+    toy_y: float = Field(320.0, description="장난감 Y 좌표")
+    chest_x: float = Field(300.0, description="장난감 상자 X 좌표")
+    chest_y: float = Field(340.0, description="장난감 상자 Y 좌표")
+
+
 class PredictionResponse(BaseModel):
     action_id: int = Field(..., description="예측된 행동 번호 (0~8)")
     action_name: str = Field(..., description="행동 영문 명칭")
@@ -138,16 +151,17 @@ def predict_by_state(req: StateRequest):
 
 @app.post("/predict/details", response_model=PredictionResponse)
 def predict_by_details(req: DetailsRequest):
-    """펫의 개별 상세 정보를 받아 정규화 및 거리를 계산한 뒤 행동 예측"""
+    """펫의 개별 상세 정보 및 가구 좌표를 받아 정규화 및 거리를 계산한 뒤 행동 예측"""
     try:
-        # Calculate distances
-        d_food = get_normalized_dist(req.pet_x, req.pet_y, FOOD_POS["x"], FOOD_POS["y"])
-        d_bed = get_normalized_dist(req.pet_x, req.pet_y, BED_POS["x"], BED_POS["y"])
-        d_wash = get_normalized_dist(req.pet_x, req.pet_y, WASH_POS["x"], WASH_POS["y"])
+        # Calculate distances using dynamic coordinates provided in the request
+        d_food = get_normalized_dist(req.pet_x, req.pet_y, req.food_x, req.food_y)
+        d_bed = get_normalized_dist(req.pet_x, req.pet_y, req.bed_x, req.bed_y)
+        d_wash = get_normalized_dist(req.pet_x, req.pet_y, req.wash_x, req.wash_y)
         
         if req.toy_placed:
-            target_toy_pos = CHEST_POS if req.carrying_toy else TOY_POS
-            d_toy = get_normalized_dist(req.pet_x, req.pet_y, target_toy_pos["x"], target_toy_pos["y"])
+            target_toy_x = req.chest_x if req.carrying_toy else req.toy_x
+            target_toy_y = req.chest_y if req.carrying_toy else req.toy_y
+            d_toy = get_normalized_dist(req.pet_x, req.pet_y, target_toy_x, target_toy_y)
         else:
             d_toy = 1.0  # Default max distance if toy is not placed
             
@@ -176,6 +190,7 @@ def predict_by_details(req: DetailsRequest):
             action_name=ACTION_NAMES[action_id],
             description=ACTION_DESCRIPTIONS[action_id]
         )
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
